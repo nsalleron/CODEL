@@ -33,6 +33,8 @@ object Main extends App {
     assert(mat(1).get(3, 1) == 7)
     assert(mat(5).get(2, 3) == -2)
     
+
+    
     
     
     assert(mat(1) == mat(0)) 
@@ -46,15 +48,14 @@ object Main extends App {
     
     
     
-    
-    
+
     assert(mat(5) == mat(4).transpose()) 
     assert(mat(1) != mat(4).transpose()) 
     assert(mat(0).transpose() == mat(1).transpose())
     
-    
+     
     assert(mat(1) * mat(2) == mat(3))
-    println("endAssert")
+   println("endAssert")
     
   /*
      * 

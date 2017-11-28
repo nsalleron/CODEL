@@ -4,7 +4,45 @@ import scala.collection.immutable.Vector._
 import org.apache.spark._
 
 
+class VectorInt(val elements:Array[Int]) extends Serializable{
+  
+  implicit def ArrayToVectorInt(t:Array[Int])=new VectorInt(t)
+  def get(i:Int):Int = elements(i)
+  def length:Int = elements.length
+  def +(other:VectorInt):VectorInt = elements.zip(other.elements).map( x=> x._1+x._2 )
+  //def -(other:Vector):Vector = elements.zip(other.elements).map( x=> x._1-x._2 )
+  def *(v:Int):VectorInt = elements.map(_*v)
+  
+  override def equals(a:Any):Boolean = a match {
+    case(o:VectorInt) =>  { 
+      if (o.length != length) return false
+      for(i <- 0 to elements.length-1){
+        if(get(i) != o.get(i)) return false
+      }
+      return true
+    }
+    case _ => false
+    
+   
+  }
+  
+  def prodD(other:VectorInt):Array[VectorInt]={
+    val res = new Array[VectorInt](length)
+    for(i <- 0 to res.length-1){
+      res(i) = other.*(get(i))
+    }
+    return res
+  }
+  
+  override def toString = {
+    val sb = new StringBuilder("(")
+    elements.foreach { x => sb.append(" "+x+" ") }
+    sb.append(")")
+    sb.toString()
+  }
+}
 
+/*
 class VectorInt(val tab : Array[Int]) extends java.io.Serializable{
     class IntVector(val original : Array[Int]) { 
       def myVector = original.toVector
@@ -64,9 +102,11 @@ class VectorInt(val tab : Array[Int]) extends java.io.Serializable{
   
   
   
-  
+ 
   
   
 
 }
+
+*/
 
