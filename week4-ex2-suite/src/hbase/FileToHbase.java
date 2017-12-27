@@ -32,6 +32,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
+import com.google.common.collect.Lists;
+
 
 
 public class FileToHbase {
@@ -41,56 +43,97 @@ public class FileToHbase {
 
 		
 	   	public void map(ImmutableBytesWritable row, Result value, Context context) throws IOException, InterruptedException {
-	   		
-	   		if(value.containsColumn(Bytes.toBytes("cf1"), Bytes.toBytes("ville"))){
+	   		String stmp ;
+			String[] bstmp;
+			
+ 	   		if(value.containsColumn(Bytes.toBytes("cf1"), Bytes.toBytes("ville"))){
 				/* Cas de villes IP
-				Put obj = new Put(DigestUtils.md5(value));
-				obj.addColumn(Bytes.toBytes("cf1"), Bytes.toBytes(t[i]), Bytes.toBytes(itr.nextToken()));
-				context.write(wordkey, obj);
-				i++;
 				*/
-	   			Text ville = new Text(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("ville")));
-	   			Text IP1 = new Text(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("ip1")));
-	   			Text IP2 = new Text(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("ip2")));
-	   			
-	   			context.write(IP1, ville);
-	   			context.write(IP2, ville);
+				Text ville = null, IP1 = null , IP2 = null;
+				byte[] tmp = null;
+				
+				/*ville */
+				tmp = value.getValue(Bytes.toBytes("cf1"),Bytes.toBytes("ville"));
+				ville = new Text("v;" + new String(tmp));
+								
+				/* IP1 */
+	   			tmp = value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("ip1"));
+	   			stmp = new String(tmp).replace(".", ";");
+	   			bstmp = stmp.split(";");
+	   			IP1 = new Text(bstmp[0]+"."+bstmp[1]+".0.0");
+	   				   			
+	   			/* IP2*/
+				tmp = value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("ip2"));
+	   			if(tmp != null){
+	   				stmp = new String(tmp).replace(".", ";");
+		   			bstmp = stmp.split(";");
+		   			IP2 = new Text(bstmp[0]+"."+bstmp[1]+".0.0");
+				}
+	   			if(IP1 != null)
+	   				context.write(IP1, ville);
+				if(IP2 != null)
+					context.write(IP2, ville);
 	   			
 			}else {
-				// Cas de connections
+				// Cas de connections FONCTIONNEL
+				byte[] tmp = value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("address"));
+				String test = new String("");
+				if(tmp != null) {
+					Text address = new Text(new String(tmp).replace(" ", ""));
+					stmp = new String(address.toString()).replace(".", ";");
+		   			bstmp = stmp.split(";");
+		   			address = new Text(bstmp[0]+"."+bstmp[1]+".0.0");
+		   			
+					 /* Vraiment moche */
+					test += new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("date")))+" ";
+					test += new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("hour")))+" ";
+					test += new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("address")))+" ";
+					if(new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("keywords"))).endsWith("+")) {
+						test += new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("keywords"))).substring(0,
+								new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("keywords"))).length() -1);
+					}else {
+						test += new String(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("keywords")));
+					}
+					Text rowval = new Text(new String("c;"+test));
+					
+					context.write(address, rowval );
+				}
 				
-				Text address = new Text(value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("address")));
-				
-				String test = new String();
-				test += value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("date"))+"_";
-				test += value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("hour"))+"_";
-				test += value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("address"))+"_";
-				test += value.getValue(Bytes.toBytes("cf1"), Bytes.toBytes("keywords"));
-				
-	
-				Text key = new Text(";"+DigestUtils.md5(test));
-				context.write(address, key);
 			}
 	   	}
 	}
 	
 	public static class MyTableReducer extends TableReducer<Text, Text, Text>  {
-
-	 	public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-	    		int i = 0;
-	    		Text wordkey = new Text("TOTO");
-	    		
-	    		if(key.toString().startsWith(";")) {	// Connexions
-	    			Put obj = new Put(key.toString().split(";")[1].getBytes());
-					obj.addColumn(Bytes.toBytes("cf1"), Bytes.toBytes("locality"), Bytes.toBytes(key.toString()));
-					context.write(wordkey, obj);
+		
+		
+		
+		public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+	    	
+	    	Text wordkey = new Text("TOTO");
+	    	String ville = "default";
+	        Put end = null;
+	        int i =0;
+	    	for(Text t : values) {
+	    		i++;
+	    		String stmp = t.toString();
+	    		if(stmp.startsWith("v")) { // Villes
+	    			ville = stmp.split(";")[1]; 
 	    		}
+	    		if(stmp.startsWith("c")) {
+	    			end = new Put(DigestUtils.md5(stmp.split(";")[1]));
+	    		}
+	    	}   	
+	    	if(end != null ) {
+	    		end.addColumn(Bytes.toBytes("cf1"), Bytes.toBytes("locality"), Bytes.toBytes(ville));
+	    		context.write(wordkey, end);
+	    	}
 	   	}
 	}
 
 	public static void main(String[] args) throws Exception {
-		
-		
+		Configuration conf = HBaseConfiguration.create();
+
+		Job job = Job.getInstance(conf,"job");
 		
 		List<Scan> scans = new ArrayList<Scan>();
 		Scan connexions = new Scan();
@@ -100,30 +143,23 @@ public class FileToHbase {
 		Scan villes_ip = new Scan();
 		villes_ip.setAttribute(Scan.SCAN_ATTRIBUTES_TABLE_NAME, Bytes.toBytes("villes_ip"));
 		scans.add(villes_ip);
-		
-		Configuration conf =new Configuration();
-		Job job = new Job(conf);
-		job.setJarByClass(FileToHbase.class);
-		
+
 		TableMapReduceUtil.initTableMapperJob(
 				scans,
-				TableMapper.class,
+				HbaseMapper.class,
 				Text.class,
 				Text.class,
 				job);
 		
-		TableMapReduceUtil.initTableReducerJob("connections", MyTableReducer.class, job);
-		
-		
+		job.setReducerClass(MyTableReducer.class);
 		job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "connections");
+		job.setJarByClass(FileToHbase.class);
 		job.setOutputFormatClass(TableOutputFormat.class);
 		job.setOutputKeyClass(ImmutableBytesWritable.class);
 		job.setOutputValueClass(Put.class);
+		job.setNumReduceTasks(3);
 		
-		
-		//final Path outDir = new Path("/tmp");
-		//FileOutputFormat.setOutputPath(job, outDir);
-
+		System.out.println("Done");
 		System.exit(job.waitForCompletion(true) ? 0 : 1);
 	}
 }

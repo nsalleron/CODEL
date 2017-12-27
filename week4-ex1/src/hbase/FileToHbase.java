@@ -62,72 +62,10 @@ public class FileToHbase {
 			
 				
 				context.write(wordkey, obj);
-				
-				/*
-        	"put 'connections','MD5HASH','cf1:hour','VALUE'"
-        	"put 'connections','MD5HASH','cf1:adress','VALUE'"
-        	"put 'connections','MD5HASH','cf1:keywords','VALUE'"*/
 			}
 
 		}
 	}
-
-	public static class BoobleReducer 
-	extends TableReducer<Text,Text,Put> {
-
-		public void reduce(Text key, Iterable<Text> values, 
-				Context context
-				) throws IOException, InterruptedException {
-
-
-			String t = key.toString();
-			String month = t.split(",")[0];
-			String heure = t.split(",")[1];
-			String tranche = t.split(",")[2];
-			HashMap<String,Integer> mostused = new HashMap<String, Integer>();
-			String res = null;
-			int max = 0;
-			Text resultat;
-			for(Text words : values) {
-
-				String[] wordsplit = words.toString().split("\\+");
-
-
-				for(String word : wordsplit) {
-					if(mostused.containsKey(word)) {
-						mostused.put(word, mostused.get(word)+1);
-						if(mostused.get(word)>max) {
-							res = word;
-							max = mostused.get(word);
-						}
-
-					}else {
-						mostused.put(word, 1);
-					}
-				}
-
-			}
-
-			/*
-			if(Integer.parseInt(tranche)<30){
-				resultat = new Text();
-				resultat.set("MOIS :"+ month + "entre "+heure+":00 et "+heure+":30 "+res +" nbtot : " +max);
-				context.write(key, resultat);
-			}else {
-				resultat = new Text();
-				resultat.set("MOIS :"+ month +"entre "+heure+":30 et "+heure+":59 "+res +" nbtot : "+ max);
-				context.write(key, resultat);
-			}
-			*/
-
-		}
-	}
-
-
-
-
-
-
 
 	public static void main(String[] args) throws Exception {
 		Configuration conf = new Configuration();
@@ -164,12 +102,6 @@ public class FileToHbase {
 		
 		final Path outDir = new Path("/tmp");
 		FileOutputFormat.setOutputPath(job, outDir);
-		/*
-		final FileSystem fs = FileSystem.get(conf);//récupération d'une référence sur le système de fichier HDFS
-		if (fs.exists(outDir)) { // test si le dossier de sortie existe
-			fs.delete(outDir, true); // on efface le dossier existant, sinon le job ne se lance pas
-		}
-		*/
 
 		System.exit(job.waitForCompletion(true) ? 0 : 1);
 	}
